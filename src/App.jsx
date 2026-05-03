@@ -34,7 +34,7 @@ function getOrCreateSessionId() {
   return id;
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 8;
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('poc_token'));
