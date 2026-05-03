@@ -2,18 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { useCart } from './hooks/useCart';
 import CartSidebar from './components/CartSidebar/CartSidebar';
 import ProductCard from './components/ProductCard/ProductCard';
+import { getProducts } from './api/productApi';
 
-// ── Seed product catalogue ─────────────────────────────────────
-const PRODUCTS = [
-  { productId: 'prod-001', name: 'Wireless Headphones',   price: 2499, category: 'Electronics',  emoji: '🎧', color: '#DBEAFE' },
-  { productId: 'prod-002', name: 'Running Sneakers',       price: 3299, category: 'Footwear',     emoji: '👟', color: '#D1FAE5' },
-  { productId: 'prod-003', name: 'Smart Watch',            price: 7999, category: 'Electronics',  emoji: '⌚', color: '#EDE9FE' },
-  { productId: 'prod-004', name: 'Cotton T-Shirt',         price:  499, category: 'Clothing',     emoji: '👕', color: '#FEF3C7' },
-  { productId: 'prod-005', name: 'Yoga Mat',               price: 1199, category: 'Fitness',      emoji: '🧘', color: '#FCE7F3' },
-  { productId: 'prod-006', name: 'Stainless Bottle',       price:  699, category: 'Accessories',  emoji: '🍶', color: '#FFEDD5' },
-  { productId: 'prod-007', name: 'Mechanical Keyboard',    price: 4599, category: 'Electronics',  emoji: '⌨️', color: '#E0F2FE' },
-  { productId: 'prod-008', name: 'Backpack (30L)',         price: 1899, category: 'Accessories',  emoji: '🎒', color: '#F0FDF4' },
-];
+// ── UI-only enrichment (emoji / colour / category) ────────────
+const PRODUCT_UI = {
+  'Wireless Headphones':     { category: 'Electronics', emoji: '🎧', color: '#DBEAFE' },
+  'Running Sneakers':        { category: 'Footwear',    emoji: '👟', color: '#D1FAE5' },
+  'Smart Watch':             { category: 'Electronics', emoji: '⌚', color: '#EDE9FE' },
+  'Cotton T-Shirt':          { category: 'Clothing',    emoji: '👕', color: '#FEF3C7' },
+  'Yoga Mat':                { category: 'Fitness',     emoji: '🧘', color: '#FCE7F3' },
+  'Stainless Steel Bottle':  { category: 'Accessories', emoji: '🍶', color: '#FFEDD5' },
+  'Mechanical Keyboard':     { category: 'Electronics', emoji: '⌨️', color: '#E0F2FE' },
+  'Backpack (30L)':          { category: 'Accessories', emoji: '🎒', color: '#F0FDF4' },
+};
+
+function enrichProduct(p) {
+  const ui = PRODUCT_UI[p.name] ?? { category: 'Other', emoji: '📦', color: '#F3F4F6' };
+  return { productId: `prod-${String(p.id).padStart(3, '0')}`, ...p, ...ui };
+}
 
 // ── Stable session ID (persisted in sessionStorage) ───────────
 function getOrCreateSessionId() {
@@ -30,6 +36,9 @@ export default function App() {
   const [sessionId]       = useState(() => getOrCreateSessionId());
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState(null);
 
   const {
     cart, loading, cartError, couponStatus, orderState,
@@ -37,9 +46,16 @@ export default function App() {
     applyCoupon, clearCart, placeOrder, resetOrder,
   } = useCart(sessionId);
 
-  const categories = ['All', ...new Set(PRODUCTS.map(p => p.category))];
+  useEffect(() => {
+    getProducts()
+      .then(res => setProducts(res.data.map(enrichProduct)))
+      .catch(err => setProductsError(err.message ?? 'Failed to load products'))
+      .finally(() => setProductsLoading(false));
+  }, []);
 
-  const filteredProducts = PRODUCTS.filter(p => {
+  const categories = ['All', ...new Set(products.map(p => p.category))];
+
+  const filteredProducts = products.filter(p => {
     const matchCat = activeCategory === 'All' || p.category === activeCategory;
     const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchCat && matchSearch;
@@ -133,7 +149,17 @@ export default function App() {
             </div>
 
             {/* Product grid */}
-            {filteredProducts.length === 0 ? (
+            {productsLoading ? (
+              <div className="text-center py-16 text-gray-400">
+                <p className="text-3xl mb-2 animate-spin">⏳</p>
+                <p>Loading products…</p>
+              </div>
+            ) : productsError ? (
+              <div className="text-center py-16 text-red-400">
+                <p className="text-3xl mb-2">⚠️</p>
+                <p>{productsError}</p>
+              </div>
+            ) : filteredProducts.length === 0 ? (
               <div className="text-center py-16 text-gray-400">
                 <p className="text-3xl mb-2">🔍</p>
                 <p>No products match your search</p>
