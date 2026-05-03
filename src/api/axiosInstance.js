@@ -13,7 +13,7 @@ const axiosInstance = axios.create({
 // Request interceptor — attach Bearer token if present
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('poc_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
