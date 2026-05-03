@@ -2,22 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { useCart } from './hooks/useCart';
 import CartSidebar from './components/CartSidebar/CartSidebar';
 import ProductCard from './components/ProductCard/ProductCard';
+import LoginPage from './components/LoginPage/LoginPage';
 import { getProducts } from './api/productApi';
 
-// ── UI-only enrichment (emoji / colour / category) ────────────
+// ── UI-only enrichment (emoji / colour) ───────────────────────
+// category now comes directly from the API
 const PRODUCT_UI = {
-  'Wireless Headphones':     { category: 'Electronics', emoji: '🎧', color: '#DBEAFE' },
-  'Running Sneakers':        { category: 'Footwear',    emoji: '👟', color: '#D1FAE5' },
-  'Smart Watch':             { category: 'Electronics', emoji: '⌚', color: '#EDE9FE' },
-  'Cotton T-Shirt':          { category: 'Clothing',    emoji: '👕', color: '#FEF3C7' },
-  'Yoga Mat':                { category: 'Fitness',     emoji: '🧘', color: '#FCE7F3' },
-  'Stainless Steel Bottle':  { category: 'Accessories', emoji: '🍶', color: '#FFEDD5' },
-  'Mechanical Keyboard':     { category: 'Electronics', emoji: '⌨️', color: '#E0F2FE' },
-  'Backpack (30L)':          { category: 'Accessories', emoji: '🎒', color: '#F0FDF4' },
+  'Wireless Headphones':    { emoji: '🎧', color: '#DBEAFE' },
+  'Running Sneakers':       { emoji: '👟', color: '#D1FAE5' },
+  'Smart Watch':            { emoji: '⌚', color: '#EDE9FE' },
+  'Cotton T-Shirt':         { emoji: '👕', color: '#FEF3C7' },
+  'Yoga Mat':               { emoji: '🧘', color: '#FCE7F3' },
+  'Stainless Steel Bottle': { emoji: '🍶', color: '#FFEDD5' },
+  'Mechanical Keyboard':    { emoji: '⌨️', color: '#E0F2FE' },
+  'Backpack (30L)':         { emoji: '🎒', color: '#F0FDF4' },
 };
 
 function enrichProduct(p) {
-  const ui = PRODUCT_UI[p.name] ?? { category: 'Other', emoji: '📦', color: '#F3F4F6' };
+  const ui = PRODUCT_UI[p.name] ?? { emoji: '📦', color: '#F3F4F6' };
   return { productId: `prod-${String(p.id).padStart(3, '0')}`, ...p, ...ui };
 }
 
@@ -32,10 +34,31 @@ function getOrCreateSessionId() {
   return id;
 }
 
+const PAGE_SIZE = 10;
+
 export default function App() {
+  const [token, setToken] = useState(() => localStorage.getItem('poc_token'));
+
+  function handleLogin(t) { setToken(t); }
+  function handleLogout() {
+    localStorage.removeItem('poc_token');
+    setToken(null);
+  }
+
+  if (!token) return <LoginPage onLogin={handleLogin} />;
+
+  return <ShopApp onLogout={handleLogout} />;
+}
+
+function ShopApp({ onLogout }) {
   const [sessionId]       = useState(() => getOrCreateSessionId());
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [allCategories, setAllCategories] = useState(['All']);
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState(null);
@@ -47,19 +70,31 @@ export default function App() {
   } = useCart(sessionId);
 
   useEffect(() => {
-    getProducts()
-      .then(res => setProducts(res.data.map(enrichProduct)))
+    setProductsLoading(true);
+    setProductsError(null);
+    const params = { limit: PAGE_SIZE, skip: page * PAGE_SIZE };
+    if (activeCategory !== 'All') params.category = activeCategory;
+    if (minPrice !== '')          params.minPrice  = minPrice;
+    if (maxPrice !== '')          params.maxPrice  = maxPrice;
+    getProducts(params)
+      .then(data => {
+        const { count = 0, products: raw = [] } = (data && typeof data === 'object' && !Array.isArray(data)) ? data : { products: data };
+        setTotalCount(count);
+        const enriched = (Array.isArray(raw) ? raw : []).map(enrichProduct);
+        setProducts(enriched);
+        // Rebuild category list only when no filter is active so pills stay stable
+        if (activeCategory === 'All' && minPrice === '' && maxPrice === '' && page === 0) {
+          setAllCategories(['All', ...new Set(enriched.map(p => p.category))]);
+        }
+      })
       .catch(err => setProductsError(err.message ?? 'Failed to load products'))
       .finally(() => setProductsLoading(false));
-  }, []);
+  }, [activeCategory, minPrice, maxPrice, page]);
 
-  const categories = ['All', ...new Set(products.map(p => p.category))];
-
-  const filteredProducts = products.filter(p => {
-    const matchCat = activeCategory === 'All' || p.category === activeCategory;
-    const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCat && matchSearch;
-  });
+  // Search stays client-side (backend has no name search)
+  const filteredProducts = products.filter(p =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const cartCount = cart.items?.reduce((s, i) => s + i.quantity, 0) ?? 0;
 
@@ -104,6 +139,13 @@ export default function App() {
               <p className="text-xs text-gray-400">Session</p>
               <p className="font-mono text-xs text-gray-600">{sessionId.slice(-8)}</p>
             </div>
+            <button
+              onClick={onLogout}
+              className="ml-2 px-3 py-1.5 text-xs font-semibold text-gray-500 border border-gray-200
+                         rounded-lg hover:border-red-300 hover:text-red-500 transition"
+            >
+              Sign out
+            </button>
           </div>
         </div>
       </header>
@@ -120,11 +162,11 @@ export default function App() {
             </div>
 
             {/* Category filter pills */}
-            <div className="flex gap-2 flex-wrap mb-4">
-              {categories.map(cat => (
+            <div className="flex gap-2 flex-wrap mb-3">
+              {allCategories.map(cat => (
                 <button
                   key={cat}
-                  onClick={() => setActiveCategory(cat)}
+                  onClick={() => { setActiveCategory(cat); setPage(0); }}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition
                     ${activeCategory === cat
                       ? 'bg-blue-600 text-white shadow-sm'
@@ -135,6 +177,34 @@ export default function App() {
                   {cat}
                 </button>
               ))}
+            </div>
+
+            {/* Price filter */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs text-gray-500 font-medium">Price:</span>
+              <input
+                type="number"
+                placeholder="Min ₹"
+                value={minPrice}
+                onChange={e => setMinPrice(e.target.value)}
+                className="w-24 px-2 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-blue-400"
+              />
+              <span className="text-xs text-gray-400">—</span>
+              <input
+                type="number"
+                placeholder="Max ₹"
+                value={maxPrice}
+                onChange={e => setMaxPrice(e.target.value)}
+                className="w-24 px-2 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-blue-400"
+              />
+              {(minPrice !== '' || maxPrice !== '') && (
+                <button
+                  onClick={() => { setMinPrice(''); setMaxPrice(''); setPage(0); }}
+                  className="text-xs text-gray-400 hover:text-red-400 transition"
+                >
+                  ✕ clear
+                </button>
+              )}
             </div>
 
             {/* Mobile search */}
@@ -176,6 +246,72 @@ export default function App() {
                 ))}
               </div>
             )}
+
+            {/* Pagination controls */}
+            {!productsLoading && !productsError && totalCount > 0 && (() => {
+              const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+              // Build page number list with ellipsis: always show first, last, current ±1
+              const getPageNums = () => {
+                const pages = new Set([0, totalPages - 1, page, page - 1, page + 1].filter(n => n >= 0 && n < totalPages));
+                const sorted = [...pages].sort((a, b) => a - b);
+                const result = [];
+                sorted.forEach((n, i) => {
+                  if (i > 0 && n - sorted[i - 1] > 1) result.push('…');
+                  result.push(n);
+                });
+                return result;
+              };
+              return (
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs text-gray-400">{totalCount} products total</span>
+                    <span className="text-xs text-gray-400">Page {page + 1} of {totalPages}</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-1 flex-wrap">
+                    {/* Prev */}
+                    <button
+                      onClick={() => setPage(p => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200
+                                 disabled:opacity-40 disabled:cursor-not-allowed
+                                 hover:border-blue-300 hover:text-blue-600 transition"
+                    >
+                      ← Prev
+                    </button>
+
+                    {/* Page number buttons */}
+                    {getPageNums().map((n, i) =>
+                      n === '…' ? (
+                        <span key={`ellipsis-${i}`} className="px-2 text-xs text-gray-400">…</span>
+                      ) : (
+                        <button
+                          key={n}
+                          onClick={() => setPage(n)}
+                          className={`w-8 h-8 text-xs font-semibold rounded-lg border transition
+                            ${page === n
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                              : 'border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'
+                            }`}
+                        >
+                          {n + 1}
+                        </button>
+                      )
+                    )}
+
+                    {/* Next */}
+                    <button
+                      onClick={() => setPage(p => p + 1)}
+                      disabled={page >= totalPages - 1}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200
+                                 disabled:opacity-40 disabled:cursor-not-allowed
+                                 hover:border-blue-300 hover:text-blue-600 transition"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* POC info strip */}
             <div className="mt-8 p-4 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-600">

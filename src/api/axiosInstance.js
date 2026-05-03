@@ -10,6 +10,18 @@ const axiosInstance = axios.create({
   timeout: 10000,
 });
 
+// Request interceptor — attach Bearer token if present
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // Response interceptor — unwrap data, normalise errors
 axiosInstance.interceptors.response.use(
   (response) => response.data,
