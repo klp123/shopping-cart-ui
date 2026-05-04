@@ -14,9 +14,11 @@
     "lint": "eslint src --ext .js,.jsx --max-warnings 0"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^2.3.0",
     "axios": "^1.7.2",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-redux": "^9.1.2"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.6",
