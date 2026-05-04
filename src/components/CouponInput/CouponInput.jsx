@@ -10,7 +10,8 @@ import React, { useState } from 'react';
  *   disabled       — bool (loading state from parent)
  *   applied        — bool (coupon already applied — locks input)
  */
-export default function CouponInput({ onApply, status = {}, disabled = false, applied = false }) {
+export default function CouponInput({ onApply, status, disabled = false, applied = false }) {
+  const safeStatus = status ?? {};
   const [code, setCode] = useState('');
 
   const handleApply = () => {
@@ -33,7 +34,7 @@ export default function CouponInput({ onApply, status = {}, disabled = false, ap
         <input
           type="text"
           data-testid="coupon-input"
-          value={applied ? (status.message ? '' : code) : code}
+          value={applied ? (safeStatus.message ? '' : code) : code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           onKeyDown={handleKeyDown}
           placeholder={applied ? 'Coupon applied ✓' : 'e.g. SAVE50'}
@@ -63,21 +64,22 @@ export default function CouponInput({ onApply, status = {}, disabled = false, ap
       </div>
 
       {/* Feedback message */}
-      {status.message && (
+      {safeStatus.message && (
         <p
           data-testid="coupon-feedback"
           className={`mt-1.5 text-xs font-medium
-            ${status.type === 'success' ? 'text-green-600' : 'text-red-500'}
+            ${safeStatus.type === 'success' ? 'text-green-600' : 'text-red-500'}
           `}
         >
-          {status.type === 'success' ? '✓ ' : '✕ '}
-          {status.message}
+          {safeStatus.type === 'success' ? '✓ ' : '✕ '}
+          {safeStatus.message}
         </p>
       )}
 
-      {!applied && !status.message && (
+      {!applied && !safeStatus.message && (
         <p className="mt-1 text-xs text-gray-400">Try: SAVE50 · SAVE100 · SAVE200</p>
       )}
     </div>
   );
 }
+
