@@ -8,6 +8,6 @@ import api from './axiosInstance';
 export const createOrder = (sessionId, userId) =>
   api.post('/orders', { sessionId, userId });
 
-/** FR08 — Fetch order detail by ID */
+/** FR08 — Fetch the order detail by ID */
 export const getOrderById = (orderId) =>
   api.get(`/orders/${orderId}`);
