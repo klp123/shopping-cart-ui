@@ -26,14 +26,13 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
 
       - name: Build
-        run: npm run build
-        env:
-          # Add any Vite env vars your app needs at build time, e.g.:
-          # VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-          NODE_ENV: production
+        run: npx vite build
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
