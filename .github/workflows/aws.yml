@@ -1,4 +1,4 @@
-name: Deploy Shopping Cart UI to S3
+ame: Deploy Shopping Cart UI to S3
 
 on:
   push:
@@ -31,6 +31,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         run: npm run build
         env:
@@ -62,4 +65,3 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
-
