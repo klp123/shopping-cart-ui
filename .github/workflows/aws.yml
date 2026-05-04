@@ -24,14 +24,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: shopping-cart-ui/package-lock.json
 
       - name: Install dependencies
-        working-directory: shopping-cart-ui
         run: npm ci
 
+      - name: Run tests
+        run: npm test
+
       - name: Build
-        working-directory: shopping-cart-ui
         run: npm run build
         env:
           # Add any Vite env vars your app needs at build time, e.g.:
